@@ -1,0 +1,16 @@
+# Private keys
+*.pem
+*.ppk
+*.key
+
+# Environment files
+.env
+.env.*
+
+# Kubernetes local configuration
+kubeconfig
+*.kubeconfig
+
+# Secrets
+*secret*.yaml
+*secret*.yml
