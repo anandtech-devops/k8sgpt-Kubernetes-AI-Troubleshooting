@@ -2,13 +2,17 @@
 
 AI-assisted Kubernetes troubleshooting using **K8sGPT, Ollama, and Llama 3.2** on an AWS EC2-based Kubernetes cluster.
 
+---
+
 ## 📌 Project Overview
 
 This project demonstrates how AI can assist a DevOps Engineer in troubleshooting Kubernetes issues.
 
-An intentional Kubernetes image-pull failure was created using an invalid Docker image tag. **K8sGPT** was used to analyze the Kubernetes resource, while **Ollama running Llama 3.2** provided a human-readable explanation of the problem.
+An intentional Kubernetes image-pull failure was created using an invalid Docker image tag. **K8sGPT** was used to analyze the failed Kubernetes Pod, while **Ollama running Llama 3.2** provided a human-readable explanation of the issue.
 
 The AI-generated recommendation was manually validated before applying the Kubernetes fix.
+
+---
 
 ## 🏗️ Architecture
 
@@ -43,14 +47,30 @@ The AI-generated recommendation was manually validated before applying the Kuber
               └──────────────────────────┘
 ```
 
+### How It Works
+
+1. A Kubernetes Deployment is created with an invalid Docker image.
+2. The Pod enters `ImagePullBackOff`.
+3. `kubectl` is used for initial troubleshooting.
+4. K8sGPT analyzes the failed Pod.
+5. K8sGPT sends the analysis to Ollama.
+6. Ollama runs the Llama 3.2 model locally.
+7. The AI provides a human-readable explanation.
+8. The recommendation is manually validated.
+9. The Kubernetes image is corrected.
+10. The Pod is verified in the `Running` state.
+
+---
+
 ## 🛠️ Technologies Used
 
 * AWS EC2
 * Kubernetes
 * kubeadm
-* containerd
-* Flannel
+* kubelet
 * kubectl
+* containerd
+* Flannel CNI
 * K8sGPT
 * Ollama
 * Llama 3.2
@@ -60,28 +80,34 @@ The AI-generated recommendation was manually validated before applying the Kuber
 * OpenSSH
 * SSH Reverse Tunnel
 
+---
+
 ## ☁️ Infrastructure
 
-### AWS
+### AWS EC2
 
 * Platform: AWS EC2
-* OS: Ubuntu
+* Operating System: Ubuntu
 * Kubernetes: v1.34.x
 * Container Runtime: containerd
 * Network Plugin: Flannel
+* Cluster Type: Single-node Kubernetes cluster
 
-### Local AI
+### Local AI Environment
 
+* Operating System: Windows
 * Ollama
 * Model: `llama3.2:latest`
-* Model size: 3.2B parameters
+* Model Parameters: 3.2B
 * Quantization: Q4_K_M
 
-The LLM was intentionally kept on the local Windows machine instead of the EC2 instance to avoid running a resource-intensive AI model on the Kubernetes server.
+The LLM was kept on the local Windows machine instead of the EC2 instance to avoid running a resource-intensive AI model on the Kubernetes server.
+
+---
 
 ## 🚀 Kubernetes Setup
 
-A single-node Kubernetes cluster was created using kubeadm.
+A single-node Kubernetes cluster was created using `kubeadm`.
 
 The cluster was configured with:
 
@@ -91,7 +117,7 @@ The cluster was configured with:
 * kubectl
 * Flannel CNI
 
-Cluster verification:
+### Verify Cluster
 
 ```bash
 kubectl get nodes
@@ -104,11 +130,13 @@ NAME                   STATUS   ROLES           VERSION
 ip-172-31-38-224       Ready    control-plane   v1.34.x
 ```
 
+---
+
 ## 🤖 K8sGPT Installation
 
-K8sGPT was installed on the EC2 instance.
+K8sGPT was installed on the Kubernetes EC2 instance.
 
-Version used:
+### Check Version
 
 ```bash
 k8sgpt version
@@ -120,13 +148,15 @@ Example:
 k8sgpt: 0.4.36
 ```
 
-Available AI providers were checked using:
+### Check AI Providers
 
 ```bash
 k8sgpt auth list
 ```
 
-Ollama was configured as the active provider.
+Ollama was configured as the active K8sGPT provider.
+
+---
 
 ## 🔗 Ollama Integration
 
@@ -136,13 +166,13 @@ Ollama was running locally on the Windows machine:
 127.0.0.1:11434
 ```
 
-The installed model was:
+The Llama model used in this project:
 
 ```text
 llama3.2:latest
 ```
 
-K8sGPT was configured to use Ollama:
+### Configure Ollama in K8sGPT
 
 ```bash
 k8sgpt auth add --backend ollama \
@@ -150,13 +180,13 @@ k8sgpt auth add --backend ollama \
   --baseurl http://127.0.0.1:11434
 ```
 
-Ollama was then configured as the default K8sGPT provider:
+Set Ollama as the default provider:
 
 ```bash
 k8sgpt auth default --provider ollama
 ```
 
-Verification:
+### Verify Configuration
 
 ```bash
 k8sgpt auth list
@@ -172,32 +202,40 @@ Active:
 > ollama
 ```
 
+---
+
 ## 🔐 Secure SSH Reverse Tunnel
 
-Ollama was not exposed directly to the internet.
+The Ollama API was **not exposed directly to the internet**.
 
-Instead, an encrypted SSH reverse tunnel was created from Windows to the AWS EC2 instance:
+Instead, an encrypted SSH reverse tunnel was created from the Windows machine to the AWS EC2 instance.
 
 ```powershell
-ssh -i "C:\Anand\food-k8s-key" `
+ssh -i "C:\path\to\your-key" `
   -N `
   -R 11434:127.0.0.1:11434 `
   ubuntu@<EC2_PUBLIC_IP>
 ```
 
-This allowed the EC2 instance to access the Windows Ollama service through:
+This allowed the Kubernetes EC2 instance to access the local Ollama service through:
 
 ```text
 127.0.0.1:11434
 ```
 
-The connection was verified from EC2:
+### Verify Ollama Connectivity from EC2
 
 ```bash
 curl http://127.0.0.1:11434/api/tags
 ```
 
-The response confirmed that `llama3.2:latest` was available.
+The response confirmed that the `llama3.2:latest` model was available.
+
+### Security Benefit
+
+Port `11434` did not need to be publicly exposed through the AWS Security Group.
+
+---
 
 ## 🧪 Creating an Intentional Kubernetes Failure
 
@@ -207,7 +245,7 @@ A test namespace was created:
 kubectl create namespace k8sgpt-lab
 ```
 
-An intentionally broken deployment was created using a non-existent image tag:
+An intentionally broken Deployment was created using a non-existent Docker image tag:
 
 ```bash
 kubectl create deployment broken-app \
@@ -215,42 +253,46 @@ kubectl create deployment broken-app \
   -n k8sgpt-lab
 ```
 
-The Pod entered:
-
-```text
-ErrImagePull
-ImagePullBackOff
-```
-
-Verification:
+### Check Pod Status
 
 ```bash
 kubectl get pods -n k8sgpt-lab
 ```
 
-Example:
+Expected result:
 
 ```text
 NAME                          READY   STATUS
 broken-app-xxxxxxxxxx-xxxxx  0/1     ImagePullBackOff
 ```
 
+The Pod initially entered:
+
+```text
+ErrImagePull
+ImagePullBackOff
+```
+
+---
+
 ## 🔍 Manual Troubleshooting
 
-The Kubernetes Pod was investigated using:
+The failed Pod was investigated using:
 
 ```bash
 kubectl describe pod <pod-name> -n k8sgpt-lab
 ```
 
-The events showed:
+The Kubernetes events showed an image-pull failure:
 
 ```text
 Failed to pull image
 nginx:this-image-does-not-exist
 ```
 
-The image did not exist, causing Kubernetes to repeatedly retry the image pull.
+The image tag did not exist, so Kubernetes repeatedly attempted to pull the image and eventually entered `ImagePullBackOff`.
+
+---
 
 ## 🧠 K8sGPT AI-Assisted Troubleshooting
 
@@ -263,7 +305,7 @@ k8sgpt analyze \
   --explain
 ```
 
-K8sGPT detected:
+K8sGPT identified the problem:
 
 ```text
 Back-off pulling image "nginx:this-image-does-not-exist"
@@ -274,11 +316,25 @@ failed to resolve image:
 docker.io/library/nginx:this-image-does-not-exist
 ```
 
-The Ollama LLM generated a human-readable explanation and suggested checking the image and updating the deployment.
+The Ollama LLM generated a human-readable explanation and suggested checking the Docker image and updating the Kubernetes Deployment.
+
+### Important Approach
+
+The AI recommendation was **not blindly applied**.
+
+The Kubernetes error was manually validated using:
+
+```bash
+kubectl describe pod
+```
+
+This demonstrates the use of AI as a **troubleshooting assistant**, while the DevOps Engineer remains responsible for validating and applying the fix.
+
+---
 
 ## 🔧 Fix
 
-The actual Kubernetes container name was first verified:
+Before updating the Deployment, the actual Kubernetes container name was verified:
 
 ```bash
 kubectl get deployment broken-app \
@@ -292,7 +348,7 @@ The container name was:
 nginx
 ```
 
-The deployment was then updated with a valid image:
+The invalid image was then replaced with a valid image:
 
 ```bash
 kubectl set image deployment/broken-app \
@@ -300,9 +356,11 @@ kubectl set image deployment/broken-app \
   -n k8sgpt-lab
 ```
 
+---
+
 ## ✅ Verification
 
-The resulting Pod was verified using:
+The Deployment was verified after applying the fix:
 
 ```bash
 kubectl get pods -n k8sgpt-lab
@@ -315,78 +373,154 @@ NAME                          READY   STATUS    RESTARTS
 broken-app-xxxxxxxxxx-xxxxx  1/1     Running   0
 ```
 
-The Kubernetes deployment successfully recovered from `ImagePullBackOff`.
+The Kubernetes Deployment successfully recovered from:
+
+```text
+ImagePullBackOff
+```
+
+to:
+
+```text
+Running
+```
+
+---
 
 ## 🔄 Troubleshooting Workflow
 
 ```text
-Kubernetes Failure
-       ↓
-kubectl get pods
-       ↓
-ImagePullBackOff
-       ↓
-kubectl describe pod
-       ↓
-K8sGPT analyze
-       ↓
-AI explanation using Ollama
-       ↓
-Engineer validates recommendation
-       ↓
-Correct Kubernetes configuration
-       ↓
-Rollout verification
-       ↓
-Pod Running
+              Kubernetes Failure
+                     │
+                     ▼
+              kubectl get pods
+                     │
+                     ▼
+              ImagePullBackOff
+                     │
+                     ▼
+            kubectl describe pod
+                     │
+                     ▼
+               K8sGPT analyze
+                     │
+                     ▼
+          AI explanation using Ollama
+                     │
+                     ▼
+       Engineer validates recommendation
+                     │
+                     ▼
+          Correct Kubernetes image
+                     │
+                     ▼
+             Rollout verification
+                     │
+                     ▼
+                Pod Running
 ```
+
+---
 
 ## 🎯 Key Learnings
 
 * Kubernetes Pod troubleshooting
 * `ErrImagePull` and `ImagePullBackOff`
-* Kubernetes Deployment and container configuration
+* Kubernetes Deployments
+* Kubernetes container configuration
 * K8sGPT AI-assisted troubleshooting
 * Ollama local LLM integration
 * Llama 3.2
-* Secure SSH reverse tunneling
+* SSH reverse tunneling
 * AWS EC2-based Kubernetes
 * Manual validation of AI-generated recommendations
 * Using AI as a troubleshooting assistant rather than blindly applying AI-generated changes
 
-## ⚠️ Security Notes
+---
 
-No private keys, AWS credentials, passwords, or sensitive configuration files are included in this repository.
+## 📸 Project Screenshots
 
-The Ollama API was not exposed publicly. A secure SSH reverse tunnel was used to connect the AWS EC2 environment to the local Ollama instance.
+Recommended screenshots for this repository:
 
-## 📁 Suggested Repository Structure
+### 1. Kubernetes Failure
+
+Show:
+
+```bash
+kubectl get pods -n k8sgpt-lab
+```
+
+with:
 
 ```text
-k8sgpt-kubernetes-ai-troubleshooting/
-│
-├── README.md
-│
-├── kubernetes/
-│   ├── namespace.yaml
-│   └── broken-deployment.yaml
-│
-├── screenshots/
-│   ├── k8sgpt-analysis.png
-│   ├── ollama-model.png
-│   ├── kubernetes-error.png
-│   └── kubernetes-fixed.png
-│
-└── docs/
-    └── troubleshooting.md
+ImagePullBackOff
 ```
+
+### 2. K8sGPT AI Analysis
+
+Show:
+
+```bash
+k8sgpt analyze --filter=Pod --namespace=k8sgpt-lab --explain
+```
+
+with:
+
+```text
+AI Provider: ollama
+```
+
+### 3. Ollama Model
+
+Show:
+
+```bash
+ollama list
+```
+
+with:
+
+```text
+llama3.2:latest
+```
+
+### 4. Successful Recovery
+
+Show:
+
+```bash
+kubectl get pods -n k8sgpt-lab
+```
+
+with:
+
+```text
+1/1   Running
+```
+
+---
+
+## ⚠️ Security Notes
+
+* No private keys are included in this repository.
+* No AWS credentials are included.
+* No passwords or secrets are included.
+* The actual EC2 public IP is not stored in the documentation.
+* The Ollama API was not exposed publicly.
+* A secure SSH reverse tunnel was used for communication between AWS EC2 and the local Ollama service.
+* Sensitive configuration values should always be stored securely and never committed to Git.
+
+---
 
 ## 👨‍💻 Author
 
 **Anand Srivastava**
 
-DevOps Engineer | AWS | Kubernetes | Docker | Jenkins | CI/CD | AI-assisted DevOps
+**DevOps Engineer**
+
+AWS | Kubernetes | Docker | Jenkins | CI/CD | AI-assisted DevOps
 
 GitHub: https://github.com/anandtech-devops
 
 LinkedIn: https://linkedin.com/in/anand-srivastava-79b51918
+
